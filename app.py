@@ -90,6 +90,8 @@ def panel_end():
 
 # ─── 뉴스 대시보드 ( 브랜딩/유산균 공용 ) ──────────────────
 def display_dashboard(mode: str, update_btn: bool = False):
+    from utils.cache import get_all_historical_titles, get_history_file_list, load_cache_by_filename
+    
     cached_data = load_weekly_cache(mode)
     data_to_render = cached_data
 
@@ -97,7 +99,11 @@ def display_dashboard(mode: str, update_btn: bool = False):
         label_kr = "브랜딩 우수 사례" if mode == "study" else "유산균 관련 기사"
         with st.status(f"{label_kr} 탐색 중... 🚀", expanded=True) as status:
             st.write("최신 소식을 스크래핑 중입니다...")
-            raw_data = fetch_news_data(mode, sample_size=6)
+            
+            # 중복 방지: 역대 모든 기사 제목 세트 가져오기
+            exclude_titles = get_all_historical_titles(mode)
+            
+            raw_data = fetch_news_data(mode, sample_size=6, exclude_titles=exclude_titles)
             if not raw_data:
                 status.update(label="데이터를 찾을 수 없습니다. 다시 시도해주세요.", state="error", expanded=False)
                 return
@@ -136,6 +142,32 @@ def display_dashboard(mode: str, update_btn: bool = False):
         for idx, item in enumerate(data_to_render):
             with cols[idx % 2]:
                 render_news_card(item)
+
+    # ─── 히스토리 관리 섹션 (하단) ───
+    if mode == "study":
+        st.markdown("<div style='margin-top:60px;'></div>", unsafe_allow_html=True)
+        panel_start("📅 과거 스터디 다시보기", "이전에 수집했던 주차별 스터디 기사들을 확인할 수 있습니다.")
+        
+        history_list = get_history_file_list(mode)
+        if not history_list:
+            st.write("기록된 과거 스터디가 없습니다.")
+        else:
+            # 주차 선택 셀렉트박스
+            history_options = [f"{h['year']}년 {h['week']}주차 스터디" for h in history_list]
+            selected_idx = st.selectbox("주차 선택", range(len(history_options)), format_func=lambda i: history_options[i])
+            
+            if st.button("기록 불러오기", key="btn_history"):
+                selected_file = history_list[selected_idx]['filename']
+                history_data = load_cache_by_filename(selected_file)
+                if history_data:
+                    st.success(f"📌 {history_options[selected_idx]} 기록을 불러왔습니다.")
+                    h_cols = st.columns(2, gap="medium")
+                    for h_idx, h_item in enumerate(history_data):
+                        with h_cols[h_idx % 2]:
+                            render_news_card(h_item)
+                else:
+                    st.error("데이터 로드 중 오류가 발생했습니다.")
+        panel_end()
 
 
 # ═══════════════════════════════════════════════════════

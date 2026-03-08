@@ -55,12 +55,12 @@ def fetch_news_data(mode: str, sample_size: int = 6) -> list:
     if mode == "study":
         # 3그룹 × 2개 = 6개 균등 추출
         source_groups = [
-            ["longblack.co", "folin.co"],
-            ["careet.net", "bemyb.kr"],
-            ["openads.co.kr", "mzworld.kr"],
+            ["longblack.co", "folin.co", "brunch.co.kr"], # 브런치 추가
+            ["careet.net", "bemyb.kr", "openads.co.kr"],
+            ["mobiinside.co.kr", "mzworld.kr", "ditoday.com"], # 소스 다양화
         ]
-        keyword = "브랜딩 사례 OR 브랜드 전략"
-        per_group = max(1, sample_size // len(source_groups))  # 기본 2
+        keyword = "브랜딩" # 쿼리 단순화 (사례/전략 제외하여 결과 확보)
+        per_group = max(1, sample_size // len(source_groups))
 
         results, seen = [], set()
         for group in source_groups:
@@ -70,6 +70,10 @@ def fetch_news_data(mode: str, sample_size: int = 6) -> list:
                 f"?q={keyword} ({site_q})&hl=ko&gl=KR&ceid=KR:ko"
             )
             items = _fetch_rss(url)
+            if not items: # 만약 특정 그룹에서 결과가 없으면 전체 검색으로 보충
+                url_fallback = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
+                items = _fetch_rss(url_fallback)
+            
             random.shuffle(items)
             parsed = _parse_items(items, mode, seen, per_group)
             results.extend(parsed)
@@ -80,8 +84,8 @@ def fetch_news_data(mode: str, sample_size: int = 6) -> list:
     else:
         # 유산균 모드 — 기존 방식 유지
         sites = ["hankyung.com", "mk.co.kr", "foodnews.co.kr",
-                 "donga.com", "chosun.com", "rapportian.com"]
-        keyword = "(intitle:유산균 OR intitle:프로바이오틱스) (출시 OR 특허 OR 연구 OR 마케팅) after:2024-12-31"
+                 "donga.com", "chosun.com", "rapportian.com", "medipana.com"]
+        keyword = "(intitle:유산균 OR intitle:프로바이오틱스) (출시 OR 특허 OR 연구 OR 마케팅)"
         site_q = " OR ".join(f"site:{s}" for s in sites)
         url = f"https://news.google.com/rss/search?q={keyword} ({site_q})&hl=ko&gl=KR&ceid=KR:ko"
         items = _fetch_rss(url)

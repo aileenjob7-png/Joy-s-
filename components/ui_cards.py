@@ -29,6 +29,35 @@ def apply_custom_css():
     [data-testid="stStatusWidget"],
     .stDeployButton { display: none !important; }
 
+    header {
+        background-color: transparent !important;
+        height: 0px !important; /* 헤더 자체 높이는 없애되 내부 버튼은 살림 */
+    }
+
+    /* 사이드바 확장 버튼(>) 강제 강조 — 주황색 플로팅 버튼 스타일 */
+    [data-testid="stSidebarCollapsedControl"] {
+        background-color: #f97316 !important;
+        color: white !important;
+        border-radius: 50% !important;
+        width: 44px !important;
+        height: 44px !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        z-index: 100000 !important;
+        margin: 12px !important;
+        box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4) !important;
+        transition: transform 0.2s ease !important;
+    }
+    [data-testid="stSidebarCollapsedControl"]:hover {
+        transform: scale(1.1) !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] svg {
+        fill: white !important;
+        width: 24px !important;
+        height: 24px !important;
+    }
+
     /* ─── 타이포그래피 ─── */
     h1 { font-size: 1.7rem !important; font-weight: 800 !important; color: #0f172a !important; }
     h2 { font-size: 1.4rem !important; font-weight: 800 !important; color: #0f172a !important; }

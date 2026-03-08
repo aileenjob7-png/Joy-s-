@@ -8,7 +8,7 @@ except ImportError:
 import streamlit as st
 from utils.scraper import fetch_news_data
 from utils.ai import get_ai_summary
-from components.ui_cards import apply_custom_css, render_news_card
+from components.ui_cards import apply_custom_css, render_news_card, render_news_list_item
 from components.ui_charts import (
     render_search_trend_area_chart,
     render_gender_distribution_donut, render_device_distribution,
@@ -161,10 +161,10 @@ def display_dashboard(mode: str, update_btn: bool = False):
                 history_data = load_cache_by_filename(selected_file)
                 if history_data:
                     st.success(f"📌 {history_options[selected_idx]} 기록을 불러왔습니다.")
-                    h_cols = st.columns(2, gap="medium")
-                    for h_idx, h_item in enumerate(history_data):
-                        with h_cols[h_idx % 2]:
-                            render_news_card(h_item)
+                    st.markdown('<div class="history-list-container">', unsafe_allow_html=True)
+                    for h_item in history_data:
+                        render_news_list_item(h_item)
+                    st.markdown('</div>', unsafe_allow_html=True)
                 else:
                     st.error("데이터 로드 중 오류가 발생했습니다.")
         panel_end()

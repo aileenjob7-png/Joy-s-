@@ -302,6 +302,49 @@ def apply_custom_css():
         margin-bottom: 12px;
         text-align: center;
     }
+
+    /* ─── 히스토리 리스트형 (게시판 스타일) ─── */
+    .history-list-container {
+        border-top: 1px solid #e2e8f0;
+        margin-top: 10px;
+    }
+    .history-item {
+        display: flex;
+        align-items: center;
+        padding: 12px 8px;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.2s;
+        text-decoration: none !important;
+    }
+    .history-item:hover {
+        background-color: #f8fafc;
+    }
+    .history-item-tag {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-right: 12px;
+        white-space: nowrap;
+    }
+    .history-item-title {
+        flex: 1;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-right: 15px;
+    }
+    .history-item-date {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        min-width: 80px;
+        text-align: right;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -338,6 +381,23 @@ def render_news_card(item: dict):
             <a href="{safe_link}" target="_blank" class="news-link">원문 기사 ↗</a>
         </div>
     </div>
+    """, unsafe_allow_html=True)
+
+
+def render_news_list_item(item: dict):
+    """기사 하나를 게시판 리스트 한 줄로 렌더링"""
+    import html as _html
+    safe_title = _html.escape(item.get('title', ''))
+    safe_source = _html.escape(item.get('source', '뉴스'))
+    safe_date = _html.escape(item.get('date', ''))
+    safe_link = item.get('link', '#').replace('"', '%22').strip()
+
+    st.markdown(f"""
+    <a href="{safe_link}" target="_blank" class="history-item">
+        <span class="history-item-tag">{safe_source}</span>
+        <span class="history-item-title">{safe_title}</span>
+        <span class="history-item-date">{safe_date}</span>
+    </a>
     """, unsafe_allow_html=True)
 
 

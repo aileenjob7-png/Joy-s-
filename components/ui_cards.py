@@ -6,14 +6,14 @@ def apply_custom_css():
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    /* ─── 전체 폰트 & 색상 초기화 (아이콘 폰트 절대 보호) ─── */
-    html, body, .main, .stMarkdown, .stText, p, li, label, button, input, select {
-        font-family: 'Pretendard', 'Inter', -apple-system, sans-serif !important;
+    /* ─── 전체 폰트 초기화 (아이콘 보호를 위해 특정 요소만 지정) ─── */
+    html, body, [data-testid="stAppViewContainer"], .stMarkdown, p, li, label, div {
+        font-family: 'Pretendard', 'Inter', -apple-system, sans-serif;
     }
-    
-    /* 아이콘 관련 요소는 커스텀 폰트 적용 제외 */
-    [data-testid*="Icon"], [class*="icon"], [class*="Material"], [class*="Symbols"], span:empty {
-        font-family: inherit !important;
+
+    /* 아이콘 폰트 강제 보존 (Streamlit Material Icons 등) */
+    span[class*="Material"], i[class*="Material"], [data-testid="stIcon"] {
+        font-family: "Material Symbols Outlined", "Material Symbols Rounded", "Material Icons" !important;
     }
 
     /* ─── 앱 배경 ─── */

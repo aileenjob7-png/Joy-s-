@@ -1,0 +1,318 @@
+import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+import streamlit as st
+from utils.scraper import fetch_news_data
+from utils.ai import get_ai_summary
+from components.ui_cards import apply_custom_css, render_news_card
+from components.ui_charts import (
+    render_search_trend_area_chart,
+    render_gender_distribution_donut, render_device_distribution,
+    render_age_search_ratio_bar,
+    render_keyword_radar_chart, get_seasonality_text,
+    render_keyword_summary_card
+)
+from utils.cache import load_weekly_cache, save_weekly_cache
+from datetime import datetime
+
+# ─── 페이지 설정 ───────────────────────────────────────
+st.set_page_config(
+    page_title="마더스올 브랜딩 스터디",
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+apply_custom_css()
+
+
+# ─── 사이드바 ───────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='padding:24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 12px;'>
+        <div style='font-size:27px; font-weight:800; color:#ffffff; letter-spacing:-0.5px;'>🧬 마더스올</div>
+        <div style='font-size:12px; color:rgba(255,255,255,0.5); margin-top:6px;'>브랜딩 스터디 대시보드</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    menu = st.radio(
+        "nav",
+        ["📚  브랜딩 스터디", "🔬  유산균 시장 포커스", "📊  마케팅 데이터랩"],
+        label_visibility="collapsed"
+    )
+
+    # 콘텐츠와 푸터 겹침 방지용 강제 여백
+    st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True)
+
+    # 최하단 고정 - flex + mt-auto 효과 (absolute bottom)
+    st.markdown(f"""
+    <div style='position:absolute; bottom:20px; left:0; right:0; padding:10px 20px 0; background-color:#18213a;'>
+        <div style='font-size:11px; color:rgba(255,255,255,0.35);'>{datetime.now().strftime('%Y-%m-%d')}</div>
+        <div style='font-size:11px; color:rgba(255,255,255,0.35); margin-top:2px;'>Powered by GPT-4o-mini</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─── 헬퍼: 페이지 헤더 (업데이트 버튼 포함) ──────────────
+def page_header(icon: str, title: str, subtitle: str, show_update_btn: bool = False, btn_key: str = ""):
+    """페이지 헤더 + 선택적으로 우상단에 outline 업데이트 버튼을 렌더링합니다."""
+    h_col, b_col = st.columns([5.5, 1.2])
+    with h_col:
+        st.markdown(f"""
+        <div style='padding:4px 0 18px;'>
+            <h2 style='margin:0; font-size:1.45rem; font-weight:800; color:#0f172a;'>{icon} {title}</h2>
+            <p style='margin:5px 0 0; font-size:0.83rem; color:#94a3b8;'>{subtitle}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    if show_update_btn:
+        with b_col:
+            st.markdown('<div class="btn-outline-update">', unsafe_allow_html=True)
+            clicked = st.button("🔄 이번 주 업데이트", key=btn_key, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            return clicked
+    return False
+
+
+# ─── 헬퍼: 섹션 패널 감싸기 (흰색 카드) ──────────────────
+def panel_start(title="", subtitle=""):
+    title_html = f"<h4 style='margin:0 0 2px; font-size:0.88rem; font-weight:700; color:#1e293b;'>{title}</h4>" if title else ""
+    sub_html    = f"<p style='margin:0 0 6px; font-size:0.75rem; color:#94a3b8;'>{subtitle}</p>" if subtitle else ""
+    st.markdown(f"""<div style='background:#fff; border-radius:10px; padding:14px 18px;
+        border:1px solid #e8ecf0; box-shadow:0 1px 3px rgba(0,0,0,0.03); margin-bottom:10px;'>
+        {title_html}{sub_html}""", unsafe_allow_html=True)
+
+def panel_end():
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ─── 뉴스 대시보드 ( 브랜딩/유산균 공용 ) ──────────────────
+def display_dashboard(mode: str, update_btn: bool = False):
+    cached_data = load_weekly_cache(mode)
+    data_to_render = cached_data
+
+    if update_btn:
+        label_kr = "브랜딩 우수 사례" if mode == "study" else "유산균 관련 기사"
+        with st.status(f"{label_kr} 탐색 중... 🚀", expanded=True) as status:
+            st.write("최신 소식을 스크래핑 중입니다...")
+            raw_data = fetch_news_data(mode, sample_size=6)
+            if not raw_data:
+                status.update(label="데이터를 찾을 수 없습니다. 다시 시도해주세요.", state="error", expanded=False)
+                return
+            st.write(f"{len(raw_data)}개 기사 수집. AI 분석 중...")
+            processed, progress_bar = [], st.progress(0)
+            for idx, item in enumerate(raw_data):
+                summary = get_ai_summary(item['title'], item['snippet'], mode)
+                progress_bar.progress((idx + 1) / len(raw_data))
+                if summary == "SKIP" or len(summary) < 10:
+                    continue
+                import re as _re
+                # [핵심요약 : ...] 태그 추출 (study 모드만)
+                key_summary = ""
+                if mode == "study":
+                    ks_match = _re.search(r'\[\s*핵심요약\s*:\s*(.+?)\s*\]', summary)
+                    if ks_match:
+                        key_summary = ks_match.group(1).strip()
+                        # ai_summary 본문에서 해당 줄 제거
+                        summary = _re.sub(r'(<br>)?\s*\[\s*핵심요약\s*:[^\]]+\]', '', summary).strip()
+                item['ai_summary'] = summary
+                item['key_summary'] = key_summary
+                processed.append(item)
+            if processed:
+                save_weekly_cache(mode, processed)
+            status.update(label=f"완료! {len(processed)}개 인사이트 갱신 🎉", state="complete", expanded=False)
+        data_to_render = processed
+
+    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+
+    if data_to_render is None:
+        st.info("👋 저장된 데이터가 없습니다. 위 버튼을 눌러 가져와 주세요.")
+    elif len(data_to_render) == 0:
+        st.warning("📍 유효한 뉴스가 부족합니다. 다시 시도해 주세요.")
+    else:
+        cols = st.columns(2, gap="medium")
+        for idx, item in enumerate(data_to_render):
+            with cols[idx % 2]:
+                render_news_card(item)
+
+
+# ═══════════════════════════════════════════════════════
+# 라우팅 — st.empty()로 각 탭 격리하여 고스팅 방지
+# ═══════════════════════════════════════════════════════
+
+# 탭 전환 시 이전 탭 잔상을 없애기 위해 단일 컨테이너에 렌더링
+main_area = st.empty()
+
+with main_area.container():
+    if menu == "📚  브랜딩 스터디":
+        # 현재 주차 계산 (연간 주차)
+        from datetime import date
+        week_num = date.today().isocalendar()[1]
+        st.markdown(f"""
+        <div style='display:inline-flex;align-items:center;gap:10px;margin-bottom:4px;'>
+            <span style='background:linear-gradient(135deg,#667eea,#764ba2);color:white;
+                font-size:0.78rem;font-weight:700;padding:3px 12px;border-radius:20px;
+                letter-spacing:0.3px;'>📅 {week_num}주차 브랜딩 스터디</span>
+        </div>
+        """, unsafe_allow_html=True)
+        clicked = page_header("📚", "브랜딩 스터디", "후발 브랜드 우수 사례를 파악하고 팀원들과 스마트하게 공유해요.",
+                               show_update_btn=True, btn_key="btn_study")
+        display_dashboard("study", update_btn=clicked)
+
+    elif menu == "🔬  유산균 시장 포커스":
+        clicked = page_header("🔬", "유산균 시장 포커스", "프로바이오틱스 시장의 최신 동향과 뉴스를 주간 단위로 파악합니다.",
+                               show_update_btn=True, btn_key="btn_probiotics")
+        display_dashboard("probiotics", update_btn=clicked)
+
+    elif menu == "📊  마케팅 데이터랩":
+        page_header("📊", "마케팅 데이터랩", "네이버 데이터랩 API 실시간 데이터 기반으로 키워드 검색 트렌드를 분석합니다.")
+
+        # ── 키워드 선택기 ──────────────────────────────────────
+        kw_col, info_col = st.columns([2.5, 5])
+        with kw_col:
+            KEYWORDS = ["프로바이오틱스", "유산균", "장건강", "락토바실러스", "비피더스", "유익균"]
+            selected_kw = st.selectbox(
+                "🔍 분석 키워드 선택", KEYWORDS, index=0,
+                help="키워드를 변경하면 아래 모든 차트가 해당 키워드의 실제 네이버 API 데이터로 업데이트됩니다."
+            )
+        with info_col:
+            st.markdown(f"""<div style='background:linear-gradient(135deg,#f0f9ff,#e0f2fe); border-radius:10px; padding:12px 16px; margin-top:22px;'>
+                <span style='font-size:0.82rem; color:#0369a1;'>📡 모든 데이터는 <b>네이버 데이터랩 API</b>에서 실시간 조회됩니다 (1시간 캐시)</span>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)
+
+        # ── 1. 상단: 레이더 + 요약 (1:1 비율) ─────────────────────
+        col_radar, col_summary = st.columns(2, gap="large")
+        with col_radar:
+            st.markdown(f"""
+            <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+                box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+                border-left:4px solid #f4a261;'>
+                <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                    <span style='font-size:1.3rem;'>🎯</span>
+                    <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                        letter-spacing:-0.3px;'>키워드 종합지수</span>
+                    <span style='margin-left:auto;background:#fff7ed;color:#f97316;
+                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                        border-radius:20px;border:1px solid #fed7aa;'>5축 평가</span>
+                </div>
+                <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
+                    '{selected_kw}' 검색트렌드 · 모바일 · 여성비중 · 계절성 · 성장률을 0~100pt로 측정
+                </div>
+            </div>""", unsafe_allow_html=True)
+            render_keyword_radar_chart(selected_kw)
+        with col_summary:
+            st.markdown(f"""
+            <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+                box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+                border-left:4px solid #60a5fa;'>
+                <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                    <span style='font-size:1.3rem;'>📋</span>
+                    <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                        letter-spacing:-0.3px;'>키워드 요약</span>
+                    <span style='margin-left:auto;background:#eff6ff;color:#3b82f6;
+                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                        border-radius:20px;border:1px solid #bfdbfe;'>데이터랩 API</span>
+                </div>
+                <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
+                    '{selected_kw}' 피크 시즌 · 데이터 소스 · 상대값 기준 안내
+                </div>
+            </div>""", unsafe_allow_html=True)
+            seasonality = get_seasonality_text(selected_kw)
+            render_keyword_summary_card(selected_kw, seasonality)
+
+        st.markdown("<hr style='border:none; border-top:1.5px solid #e8ecf0; margin:28px 0;'>", unsafe_allow_html=True)
+
+        # ── 2. 검색 트렌드 ────────────────────────────────────
+        st.markdown(f"""
+        <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+            box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+            border-left:4px solid #22c55e;'>
+            <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                <span style='font-size:1.3rem;'>📈</span>
+                <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                    letter-spacing:-0.3px;'>검색 트렌드 (최근 1년)</span>
+                <span style='margin-left:auto;background:#f0fdf4;color:#16a34a;
+                    font-size:0.7rem;font-weight:700;padding:2px 8px;
+                    border-radius:20px;border:1px solid #bbf7d0;'>월별 추이</span>
+            </div>
+            <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
+                '{selected_kw}' 네이버 통합검색 상대 트렌드(0~100pt) — 주황 점은 연간 평균 대비 20% 이상 피크 구간
+            </div>
+        </div>""", unsafe_allow_html=True)
+        render_search_trend_area_chart(keyword=selected_kw)
+
+        st.markdown("<hr style='border:none; border-top:1.5px solid #e8ecf0; margin:28px 0;'>", unsafe_allow_html=True)
+
+        # ── 3. 인사이트 상세 분석 ──────────────────────────────
+        st.markdown(f"""
+        <div style='padding:0 0 16px 0; border-bottom:1px solid #e8ecf0; margin-bottom:20px; text-align: center;'>
+            <div style='font-size:1.15rem; font-weight:800; color:#0f172a;'>인사이트 상세 분석 — '{selected_kw}'</div>
+            <div style='font-size:0.85rem; color:#64748b; margin-top:4px;'>성별 · 연령 · 기기별 검색 비율 (네이버 데이터랩 실제 데이터)</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 성별 + 기기별 (1:1 비율)
+        g_col1, g_col2 = st.columns(2, gap="large")
+        with g_col1:
+            st.markdown(f"""
+            <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+                box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+                border-left:4px solid #f72585;'>
+                <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                    <span style='font-size:1.3rem;'>👥</span>
+                    <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                        letter-spacing:-0.3px;'>성별 검색 비율</span>
+                    <span style='margin-left:auto;background:#fdf2f8;color:#db2777;
+                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                        border-radius:20px;border:1px solid #fbcfe8;'>API 실측</span>
+                </div>
+                <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
+                    '{selected_kw}' 검색 사용자의 성별 구성 비율 (네이버 데이터랩 실제 데이터)
+                </div>
+            </div>""", unsafe_allow_html=True)
+            render_gender_distribution_donut(selected_kw)
+        with g_col2:
+            st.markdown(f"""
+            <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+                box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+                border-left:4px solid #8b5cf6;'>
+                <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                    <span style='font-size:1.3rem;'>📱</span>
+                    <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                        letter-spacing:-0.3px;'>기기별 접속 비율</span>
+                    <span style='margin-left:auto;background:#f5f3ff;color:#7c3aed;
+                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                        border-radius:20px;border:1px solid #ddd6fe;'>API 실측</span>
+                </div>
+                <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
+                    '{selected_kw}' 검색 기기 비율 — 모바일/PC 버튼 (네이버 데이터랩 실제 데이터)
+                </div>
+            </div>""", unsafe_allow_html=True)
+            render_device_distribution(selected_kw)
+
+        st.markdown("<hr style='border:none; border-top:1.5px solid #e8ecf0; margin:20px 0;'>", unsafe_allow_html=True)
+
+        # 연령별
+        st.markdown(f"""
+        <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+            box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+            border-left:4px solid #60a5fa;'>
+            <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                <span style='font-size:1.3rem;'>📊</span>
+                <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                    letter-spacing:-0.3px;'>연령별 검색 비율</span>
+                <span style='margin-left:auto;background:#eff6ff;color:#3b82f6;
+                    font-size:0.7rem;font-weight:700;padding:2px 8px;
+                    border-radius:20px;border:1px solid #bfdbfe;'>API 실측</span>
+            </div>
+            <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
+                '{selected_kw}' 10대 ~ 50대+ 연령대별 검색 구성 비율 — 가장 높은 구간이 주요 타겟입니다
+            </div>
+        </div>""", unsafe_allow_html=True)
+        render_age_search_ratio_bar(selected_kw)
+
+

@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Streamlit
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# Project Specific
+.env
+cache/
+.DS_Store
+node_modules/
+dist/
+build/

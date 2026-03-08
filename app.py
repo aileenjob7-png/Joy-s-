@@ -109,14 +109,14 @@ def display_dashboard(mode: str, update_btn: bool = False):
                 if summary == "SKIP" or len(summary) < 10:
                     continue
                 import re as _re
-                # [핵심요약 : ...] 태그 추출 (study 모드만)
+                # [핵심요약 : ...] 태그 추출 (study 모드만, 개행 포함 처리)
                 key_summary = ""
                 if mode == "study":
-                    ks_match = _re.search(r'\[\s*핵심요약\s*:\s*(.+?)\s*\]', summary)
+                    ks_match = _re.search(r'\[\s*핵심요약\s*:\s*([\s\S]+?)\s*\]', summary)
                     if ks_match:
                         key_summary = ks_match.group(1).strip()
-                        # ai_summary 본문에서 해당 줄 제거
-                        summary = _re.sub(r'(<br>)?\s*\[\s*핵심요약\s*:[^\]]+\]', '', summary).strip()
+                        # ai_summary 본문에서 해당 줄 제거 (개행 포함)
+                        summary = _re.sub(r'(<br>)?\s*\[\s*핵심요약\s*:[\s\S]+?\]', '', summary).strip()
                 item['ai_summary'] = summary
                 item['key_summary'] = key_summary
                 processed.append(item)
@@ -147,14 +147,21 @@ main_area = st.empty()
 
 with main_area.container():
     if menu == "📚  브랜딩 스터디":
-        # 현재 주차 계산 (연간 주차)
+        # 현재 주차 계산 (n월 m주차)
         from datetime import date
-        week_num = date.today().isocalendar()[1]
+        import math
+        today = date.today()
+        first_day = today.replace(day=1)
+        # 월의 몇 번째 주인지 계산 (1일의 요일 고려)
+        dom = today.day
+        adjusted_dom = dom + first_day.weekday()
+        week_of_month = int(math.ceil(adjusted_dom / 7.0))
+        
         st.markdown(f"""
         <div style='display:inline-flex;align-items:center;gap:10px;margin-bottom:4px;'>
             <span style='background:linear-gradient(135deg,#667eea,#764ba2);color:white;
                 font-size:0.78rem;font-weight:700;padding:3px 12px;border-radius:20px;
-                letter-spacing:0.3px;'>📅 {week_num}주차 브랜딩 스터디</span>
+                letter-spacing:0.3px;'>📅 {today.month}월 {week_of_month}주차 브랜딩 스터디</span>
         </div>
         """, unsafe_allow_html=True)
         clicked = page_header("📚", "브랜딩 스터디", "후발 브랜드 우수 사례를 파악하고 팀원들과 스마트하게 공유해요.",

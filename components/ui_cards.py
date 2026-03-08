@@ -317,7 +317,7 @@ def render_news_card(item: dict):
     # 또한 백틱(`)이 포함되면 st.markdown이 코드 블록으로 오해하여 레이아웃이 깨지므로 제거
     raw_summary = item.get('ai_summary', '').replace('`', '')
     ai_summary  = _html.escape(raw_summary).replace('&lt;br&gt;', '<br>')
-    key_summary = _html.escape(item.get('key_summary', '').strip())
+    key_summary = _html.escape(item.get('key_summary', '').replace('`', '').strip())
 
     key_box = f"""
     <div style='background:linear-gradient(135deg,#f0f9ff,#e0f2fe);

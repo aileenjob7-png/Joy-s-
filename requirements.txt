@@ -3,5 +3,6 @@ pandas
 plotly
 openai
 beautifulsoup4
+lxml
 requests
 python-dotenv

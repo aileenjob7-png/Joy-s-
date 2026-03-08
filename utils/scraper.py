@@ -55,28 +55,34 @@ def fetch_news_data(mode: str, sample_size: int = 6) -> list:
     if mode == "study":
         # 3그룹 × 2개 = 6개 균등 추출
         source_groups = [
-            ["longblack.co", "folin.co", "brunch.co.kr"], # 브런치 추가
-            ["careet.net", "bemyb.kr", "openads.co.kr"],
-            ["mobiinside.co.kr", "mzworld.kr", "ditoday.com"], # 소스 다양화
+            ["longblack.co", "folin.co", "brunch.co.kr", "careerly.co.kr"], # 소스 추가
+            ["careet.net", "bemyb.kr", "openads.co.kr", "publy.co"],
+            ["mobiinside.co.kr", "mzworld.kr", "ditoday.com", "bloter.net"],
         ]
-        keyword = "브랜딩" # 쿼리 단순화 (사례/전략 제외하여 결과 확보)
+        keyword = "브랜드" # 더 넓은 키워드로 변경
         per_group = max(1, sample_size // len(source_groups))
 
         results, seen = [], set()
         for group in source_groups:
             site_q = " OR ".join(f"site:{s}" for s in group)
-            url = (
-                f"https://news.google.com/rss/search"
-                f"?q={keyword} ({site_q})&hl=ko&gl=KR&ceid=KR:ko"
-            )
+            url = f"https://news.google.com/rss/search?q={keyword} ({site_q})&hl=ko&gl=KR&ceid=KR:ko"
             items = _fetch_rss(url)
-            if not items: # 만약 특정 그룹에서 결과가 없으면 전체 검색으로 보충
-                url_fallback = f"https://news.google.com/rss/search?q={keyword}&hl=ko&gl=KR&ceid=KR:ko"
-                items = _fetch_rss(url_fallback)
+            
+            # 단계별 폴백: 그룹 검색 실패 시 사이트 제한 없이 해당 그룹 키워드 검색
+            if not items:
+                url_fb1 = f"https://news.google.com/rss/search?q={keyword} {group[0]}&hl=ko&gl=KR&ceid=KR:ko"
+                items = _fetch_rss(url_fb1)
             
             random.shuffle(items)
             parsed = _parse_items(items, mode, seen, per_group)
             results.extend(parsed)
+
+        # 전체 결과가 부족할 경우 최후의 수단: 가장 포괄적인 키워드로 검색
+        if len(results) < sample_size:
+            url_fb2 = f"https://news.google.com/rss/search?q=마케팅 브랜딩 트렌드&hl=ko&gl=KR&ceid=KR:ko"
+            extra_items = _fetch_rss(url_fb2)
+            extra_parsed = _parse_items(extra_items, mode, seen, sample_size - len(results))
+            results.extend(extra_parsed)
 
         random.shuffle(results)
         return results[:sample_size]

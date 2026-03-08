@@ -5,6 +5,7 @@ from utils.datalab import (
     fetch_monthly_trend, fetch_gender_ratio,
     fetch_device_ratio, fetch_age_ratio, fetch_radar_metrics,
 )
+from utils.export import get_excel_download_data
 
 EMPTY_BG = "rgba(0,0,0,0)"
 
@@ -99,6 +100,11 @@ def render_keyword_radar_chart(keyword: str = "프로바이오틱스"):
         hoverlabel=dict(bgcolor='#fff', font_size=12),
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    
+    # ── 엑셀 다운로드 (Radar)
+    df_radar = pd.DataFrame([{"지수명": k, "지수(pt)": v, "전체평균": a} for k, v, a in zip(categories, vals, avg_vals)])
+    excel_radar = get_excel_download_data(df_radar)
+    st.download_button(label="📥 지수 엑셀 다운로드", data=excel_radar, file_name=f"radar_{keyword}.xlsx", key=f"dl_radar_{keyword}")
 
 
 # ─── 키워드 요약 카드 ──────────────────────────────────
@@ -201,6 +207,10 @@ def render_search_trend_area_chart(keyword: str = "프로바이오틱스", **_kw
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
+    # ── 엑셀 다운로드 (Trend)
+    excel_trend = get_excel_download_data(df[["period", "ratio"]])
+    st.download_button(label="📥 트렌드 엑셀 다운로드", data=excel_trend, file_name=f"trend_{keyword}.xlsx", key=f"dl_trend_{keyword}")
+
     # ─ 차트 하단 접담 텍스트
     info_icon = "<span title='네이버 API 상대값(0~100pt). 최대 검색량을 100으로 환산한 비율입니다.' style='cursor:help;color:#94a3b8;'>&#9432;</span>"
     st.markdown(
@@ -233,6 +243,11 @@ def render_gender_distribution_donut(keyword: str = "프로바이오틱스"):
                       paper_bgcolor=EMPTY_BG, font=dict(family="Inter"))
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    
+    # ── 엑셀 다운로드 (Gender)
+    df_gender = pd.DataFrame([{"구분": "여성", "비율(%)": f_pct}, {"구분": "남성", "비율(%)": m_pct}])
+    excel_gender = get_excel_download_data(df_gender)
+    st.download_button(label="📥 성별 엑셀 다운로드", data=excel_gender, file_name=f"gender_{keyword}.xlsx", key=f"dl_gender_{keyword}")
     st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'>여성 <b>{f_pct}%</b> · 남성 <b>{m_pct}%</b></div>", unsafe_allow_html=True)
 
 
@@ -252,6 +267,11 @@ def render_device_distribution(keyword: str = "프로바이오틱스"):
                       height=200, paper_bgcolor=EMPTY_BG)
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    
+    # ── 엑셀 다운로드 (Device)
+    df_device = pd.DataFrame([{"구분": "모바일", "비율(%)": mob}, {"구분": "PC", "비율(%)": pc}])
+    excel_device = get_excel_download_data(df_device)
+    st.download_button(label="📥 기기별 엑셀 다운로드", data=excel_device, file_name=f"device_{keyword}.xlsx", key=f"dl_device_{keyword}")
     st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'><b>모바일 {mob}%</b> · PC {pc}%</div>", unsafe_allow_html=True)
 
 
@@ -279,6 +299,11 @@ def render_age_search_ratio_bar(keyword: str = "프로바이오틱스"):
     )
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    
+    # ── 엑셀 다운로드 (Age)
+    df_age = pd.DataFrame([{"연령대": k, "비율(%)": v} for k, v in data.items()])
+    excel_age = get_excel_download_data(df_age)
+    st.download_button(label="📥 연령별 엑셀 다운로드", data=excel_age, file_name=f"age_{keyword}.xlsx", key=f"dl_age_{keyword}")
     st.markdown(f"<div style='text-align:left;font-size:0.85rem;color:#475569;margin-top:2px;'>💡 <b>{ages[peak_i]}</b>의 검색 비율이 가장 높습니다</div>", unsafe_allow_html=True)
 
 

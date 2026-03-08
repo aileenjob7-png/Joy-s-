@@ -115,14 +115,21 @@ def display_dashboard(mode: str, update_btn: bool = False):
                 if summary == "SKIP" or len(summary) < 10:
                     continue
                 import re as _re
-                # [핵심요약 : ...] 태그 추출 (study 모드만, 개행 포함 처리)
+                
+                # 1. AI 응답 내 할루시네이션(HTML 코드 등) 사전에 제거
+                # AI가 간혹 footer HTML 등을 생성하는 경우가 있어 모든 태그 제거
+                summary = _re.sub(r'<[^>]+>', '', summary).strip()
+                
+                # 2. [핵심요약 : ...] 태그 추출 (study 모드만, 개행 포함 처리)
                 key_summary = ""
                 if mode == "study":
-                    ks_match = _re.search(r'\[\s*핵심요약\s*:\s*([\s\S]+?)\s*\]', summary)
+                    # 대괄호 안의 내용을 최대한 넓게 탐색
+                    ks_match = _re.search(r'\[\s*(핵심요약|핵심 요약)\s*[:：]\s*([\s\S]+?)\s*\]', summary)
                     if ks_match:
-                        key_summary = ks_match.group(1).strip()
-                        # ai_summary 본문에서 해당 줄 제거 (개행 포함)
-                        summary = _re.sub(r'(<br>)?\s*\[\s*핵심요약\s*:[\s\S]+?\]', '', summary).strip()
+                        key_summary = ks_match.group(2).strip()
+                        # 본문에서 해당 태그 삭제 (개행 포함)
+                        summary = _re.sub(r'\[\s*(핵심요약|핵심 요약)\s*[:：][\s\S]+?\]', '', summary).strip()
+                
                 item['ai_summary'] = summary
                 item['key_summary'] = key_summary
                 processed.append(item)

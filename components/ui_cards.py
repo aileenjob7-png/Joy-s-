@@ -351,16 +351,21 @@ def apply_custom_css():
 
 def render_news_card(item: dict):
     import html as _html
+    import re as _re
+
     # 텍스트 필드는 HTML 이스케이프 처리 (특수문자로 HTML 깨짐 방지)
     safe_title  = _html.escape(item.get('title', ''))
     safe_source = _html.escape(item.get('source', '뉴스'))
     safe_date   = _html.escape(item.get('date', ''))
     safe_link   = item.get('link', '#').replace('"', '%22').strip()
-    # ai_summary: HTML 이스케이프 후 <br> 태그만 복구 (GPT의 꺾쇠 출력으로 HTML 깨짐 방지)
-    # 또한 백틱(`)이 포함되면 st.markdown이 코드 블록으로 오해하여 레이아웃이 깨지므로 제거
-    raw_summary = item.get('ai_summary', '').replace('`', '')
+
+    # AI가 생성한 텍스트에서 혹시라도 포함된 모든 HTML 태그 제거 (안전장치)
+    def clean_html(text):
+        return _re.sub(r'<[^>]+>', '', text)
+
+    raw_summary = clean_html(item.get('ai_summary', '')).replace('`', '')
     ai_summary  = _html.escape(raw_summary).replace('&lt;br&gt;', '<br>')
-    key_summary = _html.escape(item.get('key_summary', '').replace('`', '').strip())
+    key_summary = _html.escape(clean_html(item.get('key_summary', '')).replace('`', '').strip())
 
     key_box = f"""
     <div style='background:linear-gradient(135deg,#f0f9ff,#e0f2fe);

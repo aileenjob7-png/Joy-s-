@@ -255,6 +255,7 @@ def render_gender_distribution_donut(keyword: str = "프로바이오틱스"):
     with col_dlg2:
         st.download_button(label="📥", data=excel_gender, file_name=f"gender_{keyword}.xlsx", key=f"dl_gender_icon_{keyword}", help="성별 데이터 엑셀 다운로드")
     st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'>여성 <b>{f_pct}%</b> · 남성 <b>{m_pct}%</b></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;font-size:0.7rem;color:#94a3b8;margin-top:2px;'>※ 전체 트렌드 대비 검색 패턴을 분석한 정규화 비중입니다.</div>", unsafe_allow_html=True)
 
 
 # ─── 기기별 분포 (Donut — 실제 API) ──────────────────────
@@ -281,6 +282,7 @@ def render_device_distribution(keyword: str = "프로바이오틱스"):
     with col_dld2:
         st.download_button(label="📥", data=excel_device, file_name=f"device_{keyword}.xlsx", key=f"dl_device_icon_{keyword}", help="기기별 데이터 엑셀 다운로드")
     st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'><b>모바일 {mob}%</b> · PC {pc}%</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;font-size:0.7rem;color:#94a3b8;margin-top:2px;'>※ 모바일/PC 검색량 합산 비중을 수학적으로 역산한 결과입니다.</div>", unsafe_allow_html=True)
 
 
 # ─── 연령별 검색 비율 (Bar — 실제 API) ───────────────────

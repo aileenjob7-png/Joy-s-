@@ -73,9 +73,7 @@ def fetch_keyword_trend(keywords: list, time_unit: str = "month") -> pd.DataFram
 # ═══════════════════════════════════════════════════════
 
 def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 365) -> dict:
-    """공통 패턴인 '필터 반복 호출 -> 평균 계산' 로직을 통합합니다.
-    기간을 365일로 늘려 네이버 데이터랩 웹 UI 결과와 수치를 최대한 맞춥니다.
-    """
+    """기존 방식: 단순히 각 필터의 평균을 내어 비율을 계산 (비정합성 발생 가능)"""
     start, end = _date_range(days)
     base_body = {
         "startDate": start, "endDate": end, "timeUnit": "month",
@@ -100,20 +98,66 @@ def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 365) 
     return averages
 
 
-# ═══════════════════════════════════════════════════════
-# 2. 검색 트렌드 — 성별 비율
-# ═══════════════════════════════════════════════════════
+def _calculate_proportional_ratios(keyword: str, filter_dict: dict, days: int = 365) -> dict:
+    """개선된 방식: 전체 트렌드 대비 필터별 트렌드를 정규화하여 실제 비중 산출.
+    R_total(t) = sum( w_i * R_i(t) ) 관계를 활용하여 가중치 w_i를 추정합니다.
+    """
+    start, end = _date_range(days)
+    # 1. 전체 트렌드 가져오기
+    total_data = _call_naver_api("https://openapi.naver.com/v1/datalab/search", {
+        "startDate": start, "endDate": end, "timeUnit": "month",
+        "keywordGroups": [{"groupName": keyword, "keywords": [keyword]}]
+    })
+    if not total_data or not total_data["results"][0].get("data"):
+        return {k: 0 for k in filter_dict.keys()}
+    
+    r_total = pd.Series({d["period"]: float(d["ratio"]) for d in total_data["results"][0]["data"]})
+    
+    weights = {}
+    volumes = {}
+    
+    for key, codes in filter_dict.items():
+        body = {
+            "startDate": start, "endDate": end, "timeUnit": "month",
+            "keywordGroups": [{"groupName": keyword, "keywords": [keyword]}]
+        }
+        if isinstance(codes, list): body["ages"] = codes
+        elif key in ["female", "male"]: body["gender"] = codes
+        elif key in ["mobile", "pc"]: body["device"] = codes
+        
+        f_data = _call_naver_api("https://openapi.naver.com/v1/datalab/search", body)
+        if f_data and f_data["results"][0].get("data"):
+            r_filter = pd.Series({d["period"]: float(d["ratio"]) for d in f_data["results"][0]["data"]})
+            # 가중치 w_i 추정 (R_total / R_filter 의 최솟값 근사)
+            common_idx = r_total.index.intersection(r_filter.index)
+            if not common_idx.empty:
+                # 필터값이 있는 지점에서 전체 대비 비율의 최솟값을 가중치로 사용
+                # (실제 볼륨은 항상 전체보다 작거나 같아야 하므로)
+                s_filter = (r_total[common_idx] / r_filter[common_idx].replace(0, float('inf'))).min()
+                if s_filter == float('inf') or pd.isna(s_filter): s_filter = 0
+                
+                weights[key] = s_filter
+                volumes[key] = (r_filter[common_idx] * s_filter).sum()
+            else:
+                volumes[key] = 0
+        else:
+            volumes[key] = 0
+            
+    total_vol = sum(volumes.values())
+    if total_vol == 0:
+        return {k: 100/len(filter_dict) for k in filter_dict.keys()}
+    
+    return {k: round(float(v / total_vol * 100), 1) for k, v in volumes.items()}
+
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_gender_ratio(keyword: str) -> dict:
     """{'female_pct': float, 'male_pct': float} 반환"""
-    results = _fetch_and_average_ratios(keyword, {"female": "f", "male": "m"}, days=365)
-    total = sum(results.values())
-    if total == 0:
-        return {"female_pct": 50, "male_pct": 50}
+    # 개선된 정규화 연산 사용
+    results = _calculate_proportional_ratios(keyword, {"female": "f", "male": "m"})
     return {
-        "female_pct": round(results["female"] / total * 100, 1),
-        "male_pct": round(results["male"] / total * 100, 1),
+        "female_pct": results.get("female", 50),
+        "male_pct": results.get("male", 50),
     }
 
 
@@ -124,13 +168,11 @@ def fetch_gender_ratio(keyword: str) -> dict:
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_device_ratio(keyword: str) -> dict:
     """{'mobile_pct': float, 'pc_pct': float} 반환"""
-    results = _fetch_and_average_ratios(keyword, {"mobile": "mo", "pc": "pc"})
-    total = sum(results.values())
-    if total == 0:
-        return {"mobile_pct": 50, "pc_pct": 50}
+    # 개선된 정규화 연산 사용
+    results = _calculate_proportional_ratios(keyword, {"mobile": "mo", "pc": "pc"})
     return {
-        "mobile_pct": round(results["mobile"] / total * 100, 1),
-        "pc_pct": round(results["pc"] / total * 100, 1),
+        "mobile_pct": results.get("mobile", 50),
+        "pc_pct": results.get("pc", 50),
     }
 
 
@@ -145,11 +187,9 @@ def fetch_age_ratio(keyword: str) -> dict:
         "10대": ["2"], "20대": ["3", "4"], "30대": ["5", "6"],
         "40대": ["7", "8"], "50대이상": ["9", "10", "11"],
     }
-    results = _fetch_and_average_ratios(keyword, age_groups)
-    total = sum(results.values())
-    if total == 0:
-        return {k: 20 for k in age_groups}
-    return {k: round(v / total * 100, 1) for k, v in results.items()}
+    # 연령대도 가능하면 정규화 적용 (데이터 확보가 어려운 경우 기존 평균 유지할 수도 있으나 정합성을 위해 적용)
+    results = _calculate_proportional_ratios(keyword, age_groups)
+    return results
 
 
 # ═══════════════════════════════════════════════════════

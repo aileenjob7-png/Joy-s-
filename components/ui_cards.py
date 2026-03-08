@@ -6,9 +6,9 @@ def apply_custom_css():
     @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    /* ─── 전체 폰트 & 색상 초기화 ─── */
+    /* ─── 전체 폰트 & 색상 초기화 (아이콘 폰트 제외) ─── */
     html, body, [class*="css"],
-    .stMarkdown, .stText, p, span {
+    .stMarkdown, .stText, p, span:not([class*="material-icons"]):not([class*="MaterialSymbols"]) {
         font-family: 'Pretendard', 'Inter', -apple-system, sans-serif !important;
     }
 

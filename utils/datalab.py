@@ -92,9 +92,9 @@ def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 365) 
         data = _call_naver_api("https://openapi.naver.com/v1/datalab/search", body)
         if data and data.get("results") and data["results"][0].get("data"):
             vals = [d["ratio"] for d in data["results"][0].get("data")]
-            averages[key] = sum(vals) / max(len(vals), 1)
+            averages[key] = round(float(sum(vals) / max(len(vals), 1)), 1)
         else:
-            averages[key] = 0
+            averages[key] = round(0.0, 1)
     return averages
 
 
@@ -124,7 +124,7 @@ def _calculate_proportional_ratios(keyword: str, filter_dict: dict, days: int = 
     # 2. 전체 트렌드 가져오기
     total_data = _call_naver_api(url, get_body({}))
     if not total_data or not total_data.get("results") or not total_data["results"][0].get("data"):
-        return {k: 0 for k in filter_dict.keys()}
+        return {k: round(0.0, 1) for k in filter_dict.keys()}
     
     r_total = pd.Series({d["period"]: float(d["ratio"]) for d in total_data["results"][0]["data"]})
     
@@ -136,7 +136,7 @@ def _calculate_proportional_ratios(keyword: str, filter_dict: dict, days: int = 
         elif key in ["mobile", "pc"]: 
             # 쇼핑 API는 'mo', 검색 API도 'mo' (단, fetch_device_ratio 호출자 전달값에 따라 다름)
             f_params["device"] = codes
-        
+            
         f_data = _call_naver_api(url, get_body(f_params))
         if f_data and f_data.get("results") and f_data["results"][0].get("data"):
             r_filter = pd.Series({d["period"]: float(d["ratio"]) for d in f_data["results"][0]["data"]})
@@ -261,19 +261,19 @@ def _call_shopping_dist_api(url: str, keyword: str, days: int = 30) -> dict:
     if not data or not data.get("results") or not data["results"][0].get("data"):
         return {}
     
-    # 여러 날짜의 데이터가 올 수 있으므로, 각 항목별 ratio의 합산 혹은 최근일 기준 비중 계산
-    # 네이버 웹은 '기간 합계' 비중을 보여주므로 모든 항목의 ratio를 합산하여 비중 산출
+    # 쇼핑 인사이트 키워드 분포 API는 results[0]['data']가 리스트이며,
+    # 각 요소(entry)는 period, group, ratio 필드를 직접 가집니다. (기존 카테고리 API와 구조 다름)
     dist_sum = {}
     for entry in data["results"][0]["data"]:
-        for item in entry.get("group", []):
-            group_name = item["group"]
-            ratio = float(item["ratio"])
-            dist_sum[group_name] = dist_sum.get(group_name, 0.0) + ratio
+        group_name = entry.get("group")
+        ratio = entry.get("ratio")
+        if group_name is not None and ratio is not None:
+            dist_sum[group_name] = dist_sum.get(group_name, 0.0) + float(ratio)
             
     total = sum(dist_sum.values())
     if total == 0: return {}
     
-    return {k: round(v / total * 100, 1) for k, v in dist_sum.items()}
+    return {k: round(float(v / total * 100), 1) for k, v in dist_sum.items()}
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_shopping_device_ratio(keyword: str) -> dict:

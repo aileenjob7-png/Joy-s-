@@ -89,10 +89,10 @@ def panel_end():
 
 
 # ─── 뉴스 대시보드 ( 브랜딩/유산균 공용 ) ──────────────────
-def display_dashboard(mode: str, update_btn: bool = False):
+def display_dashboard(mode: str, update_btn: bool = False, sub_mode: str = None, time_filter: str = ""):
     from utils.cache import get_all_historical_titles, get_history_file_list, load_cache_by_filename
     
-    cached_data = load_weekly_cache(mode)
+    cached_data = load_weekly_cache(mode, sub_mode)
     data_to_render = cached_data
 
     if update_btn:
@@ -103,7 +103,7 @@ def display_dashboard(mode: str, update_btn: bool = False):
             # 중복 방지: 역대 모든 기사 제목 세트 가져오기
             exclude_titles = get_all_historical_titles(mode)
             
-            raw_data = fetch_news_data(mode, sample_size=6, exclude_titles=exclude_titles)
+            raw_data = fetch_news_data(mode, sample_size=6, exclude_titles=exclude_titles, time_filter=time_filter)
             if not raw_data:
                 status.update(label="데이터를 찾을 수 없습니다. 다시 시도해주세요.", state="error", expanded=False)
                 return
@@ -134,7 +134,7 @@ def display_dashboard(mode: str, update_btn: bool = False):
                 item['key_summary'] = key_summary
                 processed.append(item)
             if processed:
-                save_weekly_cache(mode, processed)
+                save_weekly_cache(mode, processed, sub_mode)
             status.update(label=f"완료! {len(processed)}개 인사이트 갱신 🎉", state="complete", expanded=False)
         data_to_render = processed
 
@@ -155,7 +155,8 @@ def display_dashboard(mode: str, update_btn: bool = False):
         st.markdown("<div style='margin-top:60px;'></div>", unsafe_allow_html=True)
         panel_start("📅 과거 스터디 다시보기", "이전에 수집했던 주차별 스터디 기사들을 확인할 수 있습니다.")
         
-        history_list = get_history_file_list(mode)
+        # 현재 서브모드에 맞는 히스토리만 가져오기
+        history_list = get_history_file_list(mode, sub_mode)
         if not history_list:
             st.write("기록된 과거 스터디가 없습니다.")
         else:
@@ -203,9 +204,18 @@ with main_area.container():
                 letter-spacing:0.3px;'>📅 {today.month}월 {week_of_month}주차 브랜딩 스터디</span>
         </div>
         """, unsafe_allow_html=True)
-        clicked = page_header("📚", "브랜딩 스터디", "후발 브랜드 우수 사례를 파악하고 팀원들과 스마트하게 공유해요.",
-                               show_update_btn=True, btn_key="btn_study")
-        display_dashboard("study", update_btn=clicked)
+
+        tab_latest, tab_legacy = st.tabs(["🚀 (2026~) 최신 브랜딩 스터디", "🏛️ (~2025) 브랜딩 스터디"])
+        
+        with tab_latest:
+            clicked_latest = page_header("🚀", "최신 브랜딩 스터디", "최근 1개월 내에 발행된 새로운 아티클을 수집합니다.",
+                                         show_update_btn=True, btn_key="btn_study_latest")
+            display_dashboard("study", update_btn=clicked_latest, sub_mode="latest", time_filter="when:30d")
+
+        with tab_legacy:
+            clicked_legacy = page_header("🏛️", "기존 브랜딩 스터디", "사이트별 제한 없이 브랜딩 우수 사례를 광범위하게 수집합니다.",
+                                         show_update_btn=True, btn_key="btn_study_legacy")
+            display_dashboard("study", update_btn=clicked_legacy, sub_mode="legacy")
 
     elif menu == "🔬  유산균 시장 포커스":
         clicked = page_header("🔬", "유산균 시장 포커스", "프로바이오틱스 시장의 최신 동향과 뉴스를 주간 단위로 파악합니다.",

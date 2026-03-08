@@ -24,8 +24,8 @@ def apply_custom_css():
         max-width: 1400px;
     }
 
-    /* ─── Streamlit 기본 불필요 요소 제거 ─── */
-    header, footer,
+    /* ─── Streamlit 기본 불필요 요소 제거 (단, 사이드바 버튼 보존을 위해 header는 노출) ─── */
+    footer,
     [data-testid="stStatusWidget"],
     .stDeployButton { display: none !important; }
 

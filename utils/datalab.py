@@ -98,45 +98,52 @@ def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 365) 
     return averages
 
 
-def _calculate_proportional_ratios(keyword: str, filter_dict: dict, days: int = 365) -> dict:
+def _calculate_proportional_ratios(keyword: str, filter_dict: dict, days: int = 365, api_type: str = "search") -> dict:
     """개선된 방식: 전체 트렌드 대비 필터별 트렌드를 정규화하여 실제 비중 산출.
-    R_total(t) = sum( w_i * R_i(t) ) 관계를 활용하여 가중치 w_i를 추정합니다.
+    api_type: 'search' (통합검색어) 또는 'shopping' (쇼핑인사이트)
     """
     start, end = _date_range(days)
-    # 1. 전체 트렌드 가져오기
-    total_data = _call_naver_api("https://openapi.naver.com/v1/datalab/search", {
-        "startDate": start, "endDate": end, "timeUnit": "month",
-        "keywordGroups": [{"groupName": keyword, "keywords": [keyword]}]
-    })
-    if not total_data or not total_data["results"][0].get("data"):
+    
+    # 1. API 설정
+    if api_type == "shopping":
+        url = "https://openapi.naver.com/v1/datalab/shopping/category/keywords"
+        get_body = lambda f_dict: {
+            "startDate": start, "endDate": end, "timeUnit": "month",
+            "category": "50000006",
+            "keyword": [{"name": keyword, "param": [keyword]}],
+            **f_dict
+        }
+    else:
+        url = "https://openapi.naver.com/v1/datalab/search"
+        get_body = lambda f_dict: {
+            "startDate": start, "endDate": end, "timeUnit": "month",
+            "keywordGroups": [{"groupName": keyword, "keywords": [keyword]}],
+            **f_dict
+        }
+
+    # 2. 전체 트렌드 가져오기
+    total_data = _call_naver_api(url, get_body({}))
+    if not total_data or not total_data.get("results") or not total_data["results"][0].get("data"):
         return {k: 0 for k in filter_dict.keys()}
     
     r_total = pd.Series({d["period"]: float(d["ratio"]) for d in total_data["results"][0]["data"]})
     
-    weights = {}
     volumes = {}
-    
     for key, codes in filter_dict.items():
-        body = {
-            "startDate": start, "endDate": end, "timeUnit": "month",
-            "keywordGroups": [{"groupName": keyword, "keywords": [keyword]}]
-        }
-        if isinstance(codes, list): body["ages"] = codes
-        elif key in ["female", "male"]: body["gender"] = codes
-        elif key in ["mobile", "pc"]: body["device"] = codes
+        f_params = {}
+        if isinstance(codes, list): f_params["ages"] = codes
+        elif key in ["female", "male"]: f_params["gender"] = codes
+        elif key in ["mobile", "pc"]: 
+            # 쇼핑 API는 'mo', 검색 API도 'mo' (단, fetch_device_ratio 호출자 전달값에 따라 다름)
+            f_params["device"] = codes
         
-        f_data = _call_naver_api("https://openapi.naver.com/v1/datalab/search", body)
-        if f_data and f_data["results"][0].get("data"):
+        f_data = _call_naver_api(url, get_body(f_params))
+        if f_data and f_data.get("results") and f_data["results"][0].get("data"):
             r_filter = pd.Series({d["period"]: float(d["ratio"]) for d in f_data["results"][0]["data"]})
-            # 가중치 w_i 추정 (R_total / R_filter 의 최솟값 근사)
             common_idx = r_total.index.intersection(r_filter.index)
             if not common_idx.empty:
-                # 필터값이 있는 지점에서 전체 대비 비율의 최솟값을 가중치로 사용
-                # (실제 볼륨은 항상 전체보다 작거나 같아야 하므로)
                 s_filter = (r_total[common_idx] / r_filter[common_idx].replace(0, float('inf'))).min()
                 if s_filter == float('inf') or pd.isna(s_filter): s_filter = 0
-                
-                weights[key] = s_filter
                 volumes[key] = (r_filter[common_idx] * s_filter).sum()
             else:
                 volumes[key] = 0
@@ -145,7 +152,7 @@ def _calculate_proportional_ratios(keyword: str, filter_dict: dict, days: int = 
             
     total_vol = sum(volumes.values())
     if total_vol == 0:
-        return {k: 100/len(filter_dict) for k in filter_dict.keys()}
+        return {k: round(100.0/len(filter_dict), 1) for k in filter_dict.keys()}
     
     return {k: round(float(v / total_vol * 100), 1) for k, v in volumes.items()}
 
@@ -213,8 +220,44 @@ def fetch_monthly_trend(keyword: str) -> pd.DataFrame:
 
 
 # ═══════════════════════════════════════════════════════
-# 6. 레이더 차트용 — 5축 지표 (여러 필터 조합 호출)
+# 6. 쇼핑 인사이트 — 키워드 클릭 추이 (실제 구매 의향)
 # ═══════════════════════════════════════════════════════
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_shopping_trend(keyword: str) -> pd.DataFrame:
+    """쇼핑 분야(식품>건강식품) 내 키워드 클릭 추이 반환"""
+    start, end = _date_range(365)
+    # 식품 > 건강식품 카테고리 ID: 50000006
+    body = {
+        "startDate": start, "endDate": end, "timeUnit": "month",
+        "category": "50000006",
+        "keyword": [{"name": keyword, "param": [keyword]}]
+    }
+    url = "https://openapi.naver.com/v1/datalab/shopping/category/keywords"
+    data = _call_naver_api(url, body)
+    if not data or not data.get("results"):
+        return pd.DataFrame()
+    
+    rows = [{"period": d["period"], "ratio": d["ratio"]}
+            for d in data["results"][0].get("data", [])]
+    return pd.DataFrame(rows)
+
+
+# ═══════════════════════════════════════════════════════
+# 7. 쇼핑 인사이트 전용 비중 산출
+# ═══════════════════════════════════════════════════════
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_shopping_device_ratio(keyword: str) -> dict:
+    """쇼핑 클릭 시 기기 비중 {'mobile_pct': float, 'pc_pct': float}"""
+    results = _calculate_proportional_ratios(keyword, {"mobile": "mo", "pc": "pc"}, api_type="shopping")
+    return {"mobile_pct": results.get("mobile", 50), "pc_pct": results.get("pc", 50)}
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_shopping_gender_ratio(keyword: str) -> dict:
+    """쇼핑 클릭 시 성별 비중 {'female_pct': float, 'male_pct': float}"""
+    results = _calculate_proportional_ratios(keyword, {"female": "f", "male": "m"}, api_type="shopping")
+    return {"female_pct": results.get("female", 50), "male_pct": results.get("male", 50)}
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_radar_metrics(keyword: str) -> dict:

@@ -226,63 +226,123 @@ def render_search_trend_area_chart(keyword: str = "프로바이오틱스", **_kw
     )
 
 
-# ─── 성별 분포 (Gauge — 실제 API) ─────────────────────────
-def render_gender_distribution_donut(keyword: str = "프로바이오틱스"):
+# ─── 쇼핑 클릭 추이 (Line — 실제 API) ──────────────────────
+def render_shopping_trend_chart(keyword: str):
+    """쇼핑인사이트 키워드 클릭 추이 시각화"""
+    from utils.datalab import fetch_shopping_trend
+    df = fetch_shopping_trend(keyword)
     
-    data = fetch_gender_ratio(keyword)
-    f_pct = data["female_pct"]
-    m_pct = data["male_pct"]
+    if df.empty:
+        st.info(f"'{keyword}' 쇼핑 클릭 데이터가 없거나 카테고리(건강식품)와 일치하지 않습니다.")
+        return
 
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number", value=f_pct,
-        number={'suffix': "%", 'font': {'size': 32, 'color': '#111'}},
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "여성 비율", 'font': {'size': 12, 'color': '#888'}},
-        gauge={
-            'axis': {'range': [None, 100], 'visible': False},
-            'bar': {'color': "#f72585"}, 'bgcolor': "#ffe5f1", 'shape': "angular",
-        }
+    months = pd.to_datetime(df["period"])
+    ratios = df["ratio"].tolist()
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=months, y=ratios,
+        name="쇼핑 클릭 추이",
+        mode="lines+markers",
+        line=dict(color="#f43f5e", width=2.5),
+        marker=dict(size=5, color="#f43f5e", line=dict(width=1.5, color="white")),
+        fill="tozeroy", fillcolor="rgba(244,63,94,0.10)",
+        hovertemplate="%{x|%Y-%m}<br>클릭지수: <b>%{y:.0f}pt</b><extra></extra>",
     ))
-    fig.update_layout(height=200, margin=dict(t=30, b=10, l=20, r=20),
-                      paper_bgcolor=EMPTY_BG, font=dict(family="Inter"))
-    
+
+    fig.update_layout(
+        plot_bgcolor=EMPTY_BG, paper_bgcolor=EMPTY_BG,
+        margin=dict(t=16, b=24, l=10, r=40),
+        height=280, hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=11)),
+        xaxis=dict(showgrid=False, tickformat="%Y-%m", tickfont=dict(size=11, color="#94a3b8"), dtick="M1"),
+        yaxis=dict(
+            title=dict(text="클릭 지수 (상대값)", font=dict(size=11, color="#94a3b8")),
+            range=[0, 110], showgrid=True, gridcolor="rgba(200,200,200,0.18)",
+            tickfont=dict(size=10, color="#94a3b8"),
+        ),
+    )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
-    # ── 엑셀 다운로드 (Gender) - 소형 아이콘화
-    df_gender = pd.DataFrame([{"구분": "여성", "비율(%)": f_pct}, {"구분": "남성", "비율(%)": m_pct}])
+    # 엑셀 다운로드
+    excel_shop = get_excel_download_data(df)
+    col_dls1, col_dls2 = st.columns([12, 1])
+    with col_dls2:
+        st.download_button(label="📥", data=excel_shop, file_name=f"shopping_{keyword}.xlsx", key=f"dl_shop_icon_{keyword}", help="쇼핑 데이터 엑셀 다운로드")
+    
+    st.markdown("<div style='font-size:0.8rem;color:#475569;margin-top:4px;'>🛒 <b>실제 구매로 이어지는 의향</b>을 나타내는 지표입니다.</div>", unsafe_allow_html=True)
+
+
+# ─── 성별 분포 (Search vs Shopping 비교) ─────────────────
+def render_gender_distribution_donut(keyword: str = "프로바이오틱스"):
+    from utils.datalab import fetch_gender_ratio, fetch_shopping_gender_ratio
+    
+    s_data = fetch_gender_ratio(keyword)
+    shop_data = fetch_shopping_gender_ratio(keyword)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<div style='text-align:center;font-size:0.85rem;color:#64748b;'>🔍 검색 사용자</div>", unsafe_allow_html=True)
+        f_pct = s_data["female_pct"]
+        fig = go.Figure(go.Pie(labels=['여성', '남성'], values=[f_pct, 100-f_pct], hole=.6, marker_colors=['#f72585', '#e2e8f0'], textinfo='percent'))
+        fig.update_layout(height=160, margin=dict(t=10, b=10, l=10, r=10), showlegend=False, paper_bgcolor=EMPTY_BG)
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        
+    with col2:
+        st.markdown("<div style='text-align:center;font-size:0.85rem;color:#64748b;'>🛒 쇼핑 구매자</div>", unsafe_allow_html=True)
+        sf_pct = shop_data["female_pct"]
+        fig = go.Figure(go.Pie(labels=['여성', '남성'], values=[sf_pct, 100-sf_pct], hole=.6, marker_colors=['#f06292', '#e2e8f0'], textinfo='percent'))
+        fig.update_layout(height=160, margin=dict(t=10, b=10, l=10, r=10), showlegend=False, paper_bgcolor=EMPTY_BG)
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+    # Excel Download
+    df_gender = pd.DataFrame([
+        {"구분": "검색_여성", "비율(%)": f_pct}, {"구분": "검색_남성", "비율(%)": 100-f_pct},
+        {"구분": "쇼핑_여성", "비율(%)": sf_pct}, {"구분": "쇼핑_남성", "비율(%)": 100-sf_pct}
+    ])
     excel_gender = get_excel_download_data(df_gender)
-    col_dlg1, col_dlg2 = st.columns([8, 1])
+    col_dlg1, col_dlg2 = st.columns([12, 1])
     with col_dlg2:
-        st.download_button(label="📥", data=excel_gender, file_name=f"gender_{keyword}.xlsx", key=f"dl_gender_icon_{keyword}", help="성별 데이터 엑셀 다운로드")
-    st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'>여성 <b>{f_pct}%</b> · 남성 <b>{m_pct}%</b></div>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align:center;font-size:0.7rem;color:#94a3b8;margin-top:2px;'>※ 전체 트렌드 대비 검색 패턴을 분석한 정규화 비중입니다.</div>", unsafe_allow_html=True)
+        st.download_button(label="📥", data=excel_gender, file_name=f"gender_compare_{keyword}.xlsx", key=f"dl_gender_icon_{keyword}")
+    
+    st.markdown("<div style='text-align:center;font-size:0.7rem;color:#94a3b8;'>※ 정보 검색 시와 실제 구매 시의 성별 비중 차이를 확인하세요.</div>", unsafe_allow_html=True)
 
 
-# ─── 기기별 분포 (Donut — 실제 API) ──────────────────────
+# ─── 기기별 분포 (Search vs Shopping 비교) ────────────────
 def render_device_distribution(keyword: str = "프로바이오틱스"):
+    from utils.datalab import fetch_device_ratio, fetch_shopping_device_ratio
     
-    data = fetch_device_ratio(keyword)
-    mob = data["mobile_pct"]
-    pc = data["pc_pct"]
+    s_data = fetch_device_ratio(keyword)
+    shop_data = fetch_shopping_device_ratio(keyword)
+    
+    mob_s = s_data["mobile_pct"]
+    mob_shop = shop_data["mobile_pct"]
 
-    fig = go.Figure(data=[go.Pie(
-        labels=['모바일', 'PC'], values=[mob, pc], hole=.6,
-        marker_colors=['#60a5fa', '#e0f2fe'],
-        textinfo='label+percent', hoverinfo='label+percent',
-    )])
-    fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10),
-                      height=200, paper_bgcolor=EMPTY_BG)
-    
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-    
-    # ── 엑셀 다운로드 (Device) - 소형 아이콘화
-    df_device = pd.DataFrame([{"구분": "모바일", "비율(%)": mob}, {"구분": "PC", "비율(%)": pc}])
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("<div style='text-align:center;font-size:0.85rem;color:#64748b;'>🔍 검색 기기</div>", unsafe_allow_html=True)
+        fig = go.Figure(data=[go.Pie(labels=['모바일', 'PC'], values=[mob_s, 100-mob_s], hole=.6, marker_colors=['#60a5fa', '#f1f5f9'], textinfo='percent')])
+        fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=160, paper_bgcolor=EMPTY_BG)
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        
+    with col2:
+        st.markdown("<div style='text-align:center;font-size:0.85rem;color:#64748b;'>🛒 쇼핑 기기</div>", unsafe_allow_html=True)
+        fig = go.Figure(data=[go.Pie(labels=['모바일', 'PC'], values=[mob_shop, 100-mob_shop], hole=.6, marker_colors=['#3b82f6', '#f1f5f9'], textinfo='percent')])
+        fig.update_layout(showlegend=False, margin=dict(t=10, b=10, l=10, r=10), height=160, paper_bgcolor=EMPTY_BG)
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+    # Excel Download
+    df_device = pd.DataFrame([
+        {"구분": "검색_모바일", "비율(%)": mob_s}, {"구분": "검색_PC", "비율(%)": 100-mob_s},
+        {"구분": "쇼핑_모바일", "비율(%)": mob_shop}, {"구분": "쇼핑_PC", "비율(%)": 100-mob_shop}
+    ])
     excel_device = get_excel_download_data(df_device)
-    col_dld1, col_dld2 = st.columns([8, 1])
+    col_dld1, col_dld2 = st.columns([12, 1])
     with col_dld2:
-        st.download_button(label="📥", data=excel_device, file_name=f"device_{keyword}.xlsx", key=f"dl_device_icon_{keyword}", help="기기별 데이터 엑셀 다운로드")
-    st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'><b>모바일 {mob}%</b> · PC {pc}%</div>", unsafe_allow_html=True)
-    st.markdown("<div style='text-align:center;font-size:0.7rem;color:#94a3b8;margin-top:2px;'>※ 모바일/PC 검색량 합산 비중을 수학적으로 역산한 결과입니다.</div>", unsafe_allow_html=True)
+        st.download_button(label="📥", data=excel_device, file_name=f"device_compare_{keyword}.xlsx", key=f"dl_device_icon_{keyword}")
+    
+    st.markdown(f"<div style='text-align:center;font-size:0.82rem;color:#475569;'>쇼핑 시 모바일 비중이 <b>{mob_shop}%</b>로 훨씬 높게 나타납니다.</div>", unsafe_allow_html=True)
 
 
 # ─── 연령별 검색 비율 (Bar — 실제 API) ───────────────────

@@ -289,24 +289,47 @@ with main_area.container():
 
         st.markdown("<hr style='border:none; border-top:1.5px solid #e8ecf0; margin:28px 0;'>", unsafe_allow_html=True)
 
-        # ── 2. 검색 트렌드 ────────────────────────────────────
-        st.markdown(f"""
-        <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
-            box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
-            border-left:4px solid #22c55e;'>
-            <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
-                <span style='font-size:1.3rem;'>📈</span>
-                <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
-                    letter-spacing:-0.3px;'>검색 트렌드 (최근 1년)</span>
-                <span style='margin-left:auto;background:#f0fdf4;color:#16a34a;
-                    font-size:0.7rem;font-weight:700;padding:2px 8px;
-                    border-radius:20px;border:1px solid #bbf7d0;'>월별 추이</span>
-            </div>
-            <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
-                '{selected_kw}' 네이버 통합검색 상대 트렌드(0~100pt) — 주황 점은 연간 평균 대비 20% 이상 피크 구간
-            </div>
-        </div>""", unsafe_allow_html=True)
-        render_search_trend_area_chart(keyword=selected_kw)
+        # ── 2. 트렌드 비교 (검색 vs 쇼핑) ───────────────────────
+        col_t1, col_t2 = st.columns(2, gap="large")
+        with col_t1:
+            st.markdown(f"""
+            <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+                box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+                border-left:4px solid #22c55e;'>
+                <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                    <span style='font-size:1.3rem;'>🔍</span>
+                    <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                        letter-spacing:-0.3px;'>검색 트렌드 (최근 1년)</span>
+                    <span style='margin-left:auto;background:#f0fdf4;color:#16a34a;
+                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                        border-radius:20px;border:1px solid #bbf7d0;'>정보 탐색</span>
+                </div>
+                <div style='font-size:0.75rem;color:#94a3b8;padding-left:2px;'>
+                    네이버 통합검색어 추이 (0~100pt)
+                </div>
+            </div>""", unsafe_allow_html=True)
+            from components.ui_charts import render_search_trend_area_chart
+            render_search_trend_area_chart(keyword=selected_kw)
+
+        with col_t2:
+            st.markdown(f"""
+            <div style='background:white;border:1px solid #edf2f7;border-radius:12px;
+                box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:18px 22px 10px;
+                border-left:4px solid #f43f5e;'>
+                <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
+                    <span style='font-size:1.3rem;'>🛒</span>
+                    <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
+                        letter-spacing:-0.3px;'>쇼핑 클릭 트렌드 (최근 1년)</span>
+                    <span style='margin-left:auto;background:#fff1f2;color:#e11d48;
+                        font-size:0.7rem;font-weight:700;padding:2px 8px;
+                        border-radius:20px;border:1px solid #fecdd3;'>구매 의향</span>
+                </div>
+                <div style='font-size:0.75rem;color:#94a3b8;padding-left:2px;'>
+                    네이버 쇼핑(건강식품) 클릭 추이 (0~100pt)
+                </div>
+            </div>""", unsafe_allow_html=True)
+            from components.ui_charts import render_shopping_trend_chart
+            render_shopping_trend_chart(keyword=selected_kw)
 
         st.markdown("<hr style='border:none; border-top:1.5px solid #e8ecf0; margin:28px 0;'>", unsafe_allow_html=True)
 
@@ -314,7 +337,7 @@ with main_area.container():
         st.markdown(f"""
         <div style='padding:0 0 16px 0; border-bottom:1px solid #e8ecf0; margin-bottom:20px; text-align: center;'>
             <div style='font-size:1.15rem; font-weight:800; color:#0f172a;'>인사이트 상세 분석 — '{selected_kw}'</div>
-            <div style='font-size:0.85rem; color:#64748b; margin-top:4px;'>성별 · 연령 · 기기별 검색 비율 (네이버 데이터랩 실제 데이터)</div>
+            <div style='font-size:0.85rem; color:#64748b; margin-top:4px;'>정보 검색 vs 실제 구매 패턴 비교 (네이버 데이터랩 API 실측 기반)</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -328,13 +351,13 @@ with main_area.container():
                 <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
                     <span style='font-size:1.3rem;'>👥</span>
                     <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
-                        letter-spacing:-0.3px;'>성별 검색 비율</span>
+                        letter-spacing:-0.3px;'>성별 검색/구매 비중</span>
                     <span style='margin-left:auto;background:#fdf2f8;color:#db2777;
                         font-size:0.7rem;font-weight:700;padding:2px 8px;
-                        border-radius:20px;border:1px solid #fbcfe8;'>API 실측</span>
+                        border-radius:20px;border:1px solid #fbcfe8;'>비교분석</span>
                 </div>
-                <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
-                    '{selected_kw}' 검색 사용자의 성별 구성 비율 (네이버 데이터랩 실제 데이터)
+                <div style='font-size:0.75rem;color:#94a3b8;padding-left:2px;'>
+                    정보 검색 시와 실제 쇼핑 클릭 시의 성별 차이
                 </div>
             </div>""", unsafe_allow_html=True)
             render_gender_distribution_donut(selected_kw)
@@ -346,13 +369,13 @@ with main_area.container():
                 <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>
                     <span style='font-size:1.3rem;'>📱</span>
                     <span style='font-size:1.05rem;font-weight:800;color:#0f172a;
-                        letter-spacing:-0.3px;'>기기별 접속 비율</span>
+                        letter-spacing:-0.3px;'>기기별 접속/쇼핑 비중</span>
                     <span style='margin-left:auto;background:#f5f3ff;color:#7c3aed;
                         font-size:0.7rem;font-weight:700;padding:2px 8px;
-                        border-radius:20px;border:1px solid #ddd6fe;'>API 실측</span>
+                        border-radius:20px;border:1px solid #ddd6fe;'>비교분석</span>
                 </div>
-                <div style='font-size:0.78rem;color:#94a3b8;padding-left:2px;'>
-                    '{selected_kw}' 검색 기기 비율 — 모바일/PC 버튼 (네이버 데이터랩 실제 데이터)
+                <div style='font-size:0.75rem;color:#94a3b8;padding-left:2px;'>
+                    모바일 구매가 압도적인 쇼핑 트렌드 실측 데이터
                 </div>
             </div>""", unsafe_allow_html=True)
             render_device_distribution(selected_kw)

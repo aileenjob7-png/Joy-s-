@@ -55,11 +55,11 @@ def fetch_news_data(mode: str, sample_size: int = 6) -> list:
     if mode == "study":
         # 3그룹 × 2개 = 6개 균등 추출
         source_groups = [
-            ["longblack.co", "folin.co", "brunch.co.kr", "careerly.co.kr"], # 소스 추가
-            ["careet.net", "bemyb.kr", "openads.co.kr", "publy.co"],
-            ["mobiinside.co.kr", "mzworld.kr", "ditoday.com", "bloter.net"],
+            ["longblack.co", "folin.co"],
+            ["careet.net", "bemyb.kr"],
+            ["openads.co.kr", "mzworld.kr"],
         ]
-        keyword = "브랜드" # 더 넓은 키워드로 변경
+        keyword = "브랜딩" # 키워드는 단순하게 유지하여 수집 가능성 확보
         per_group = max(1, sample_size // len(source_groups))
 
         results, seen = [], set()
@@ -68,21 +68,14 @@ def fetch_news_data(mode: str, sample_size: int = 6) -> list:
             url = f"https://news.google.com/rss/search?q={keyword} ({site_q})&hl=ko&gl=KR&ceid=KR:ko"
             items = _fetch_rss(url)
             
-            # 단계별 폴백: 그룹 검색 실패 시 사이트 제한 없이 해당 그룹 키워드 검색
+            # 특정 그룹 검색 실패 시 해당 그룹 내 사이트 개별 검색 시도
             if not items:
-                url_fb1 = f"https://news.google.com/rss/search?q={keyword} {group[0]}&hl=ko&gl=KR&ceid=KR:ko"
-                items = _fetch_rss(url_fb1)
+                url_fb = f"https://news.google.com/rss/search?q={keyword} {group[0]}&hl=ko&gl=KR&ceid=KR:ko"
+                items = _fetch_rss(url_fb)
             
             random.shuffle(items)
             parsed = _parse_items(items, mode, seen, per_group)
             results.extend(parsed)
-
-        # 전체 결과가 부족할 경우 최후의 수단: 가장 포괄적인 키워드로 검색
-        if len(results) < sample_size:
-            url_fb2 = f"https://news.google.com/rss/search?q=마케팅 브랜딩 트렌드&hl=ko&gl=KR&ceid=KR:ko"
-            extra_items = _fetch_rss(url_fb2)
-            extra_parsed = _parse_items(extra_items, mode, seen, sample_size - len(results))
-            results.extend(extra_parsed)
 
         random.shuffle(results)
         return results[:sample_size]

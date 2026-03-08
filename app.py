@@ -160,11 +160,13 @@ def display_dashboard(mode: str, update_btn: bool = False, sub_mode: str = None,
         if not history_list:
             st.write("기록된 과거 스터디가 없습니다.")
         else:
-            # 주차 선택 셀렉트박스
+            # 주차 선택 셀렉트박스 (sub_mode별 고유 키 부여)
             history_options = [f"{h['year']}년 {h['week']}주차 스터디" for h in history_list]
-            selected_idx = st.selectbox("주차 선택", range(len(history_options)), format_func=lambda i: history_options[i])
+            selected_idx = st.selectbox("주차 선택", range(len(history_options)), 
+                                        format_func=lambda i: history_options[i],
+                                        key=f"sb_history_{sub_mode or 'default'}")
             
-            if st.button("기록 불러오기", key="btn_history"):
+            if st.button("기록 불러오기", key=f"btn_history_{sub_mode or 'default'}"):
                 selected_file = history_list[selected_idx]['filename']
                 history_data = load_cache_by_filename(selected_file)
                 if history_data:

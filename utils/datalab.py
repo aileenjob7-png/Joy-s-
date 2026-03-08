@@ -72,8 +72,10 @@ def fetch_keyword_trend(keywords: list, time_unit: str = "month") -> pd.DataFram
 # 통합 도우미: 필터별 평균 비율 산출
 # ═══════════════════════════════════════════════════════
 
-def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 180) -> dict:
-    """공통 패턴인 '필터 반복 호출 -> 평균 계산' 로직을 통합합니다."""
+def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 365) -> dict:
+    """공통 패턴인 '필터 반복 호출 -> 평균 계산' 로직을 통합합니다.
+    기간을 365일로 늘려 네이버 데이터랩 웹 UI 결과와 수치를 최대한 맞춥니다.
+    """
     start, end = _date_range(days)
     base_body = {
         "startDate": start, "endDate": end, "timeUnit": "month",
@@ -90,8 +92,8 @@ def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 180) 
             body["device"] = codes
             
         data = _call_naver_api("https://openapi.naver.com/v1/datalab/search", body)
-        if data and data.get("results"):
-            vals = [d["ratio"] for d in data["results"][0].get("data", [])]
+        if data and data.get("results") and data["results"][0].get("data"):
+            vals = [d["ratio"] for d in data["results"][0].get("data")]
             averages[key] = sum(vals) / max(len(vals), 1)
         else:
             averages[key] = 0
@@ -105,7 +107,7 @@ def _fetch_and_average_ratios(keyword: str, filter_dict: dict, days: int = 180) 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_gender_ratio(keyword: str) -> dict:
     """{'female_pct': float, 'male_pct': float} 반환"""
-    results = _fetch_and_average_ratios(keyword, {"female": "f", "male": "m"})
+    results = _fetch_and_average_ratios(keyword, {"female": "f", "male": "m"}, days=365)
     total = sum(results.values())
     if total == 0:
         return {"female_pct": 50, "male_pct": 50}

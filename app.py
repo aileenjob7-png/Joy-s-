@@ -89,7 +89,7 @@ def panel_end():
 
 
 # ─── 뉴스 대시보드 ( 브랜딩/유산균 공용 ) ──────────────────
-def display_dashboard(mode: str, update_btn: bool = False, sub_mode: str = None, time_filter: str = ""):
+def display_dashboard(mode: str, update_btn: bool = False, sub_mode: str = "legacy", time_filter: str = ""):
     from utils.cache import get_all_historical_titles, get_history_file_list, load_cache_by_filename
     
     cached_data = load_weekly_cache(mode, sub_mode)
@@ -233,11 +233,16 @@ with main_area.container():
             KEYWORDS = ["프로바이오틱스", "유산균", "장건강", "락토바실러스", "비피더스", "유익균"]
             selected_kw = st.selectbox(
                 "🔍 분석 키워드 선택", KEYWORDS, index=0,
+                key="datalab_kw_select",
                 help="키워드를 변경하면 아래 모든 차트가 해당 키워드의 실제 네이버 API 데이터로 업데이트됩니다."
             )
+            if st.button("🔄 데이터 새로고침", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
         with info_col:
             st.markdown(f"""<div style='background:linear-gradient(135deg,#f0f9ff,#e0f2fe); border-radius:10px; padding:12px 16px; margin-top:22px;'>
-                <span style='font-size:0.82rem; color:#0369a1;'>📡 모든 데이터는 <b>네이버 데이터랩 API</b>에서 실시간 조회됩니다 (1시간 캐시)</span>
+                <span style='font-size:0.82rem; color:#0369a1;'>📡 데이터는 웹과 동일한 <b>1년 기간/상상대값</b> 기준입니다 (1시간 캐시)</span>
+                <div style='font-size:0.7rem; color:#0c4a6e; margin-top:4px;'>※ 네이버 API 특성상 조회 시점/단위에 따라 웹 UI와 미세한 차이가 있을 수 있습니다.</div>
             </div>""", unsafe_allow_html=True)
 
         st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)

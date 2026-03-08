@@ -101,10 +101,12 @@ def render_keyword_radar_chart(keyword: str = "프로바이오틱스"):
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
-    # ── 엑셀 다운로드 (Radar)
+    # ── 엑셀 다운로드 (Radar) - 소형 아이콘화
     df_radar = pd.DataFrame([{"지수명": k, "지수(pt)": v, "전체평균": a} for k, v, a in zip(categories, vals, avg_vals)])
     excel_radar = get_excel_download_data(df_radar)
-    st.download_button(label="📥 지수 엑셀 다운로드", data=excel_radar, file_name=f"radar_{keyword}.xlsx", key=f"dl_radar_{keyword}")
+    col_dl1, col_dl2 = st.columns([8, 1])
+    with col_dl2:
+        st.download_button(label="📥", data=excel_radar, file_name=f"radar_{keyword}.xlsx", key=f"dl_radar_icon_{keyword}", help="지수 데이터 엑셀 다운로드")
 
 
 # ─── 키워드 요약 카드 ──────────────────────────────────
@@ -207,9 +209,11 @@ def render_search_trend_area_chart(keyword: str = "프로바이오틱스", **_kw
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # ── 엑셀 다운로드 (Trend)
+    # ── 엑셀 다운로드 (Trend) - 소형 아이콘화
     excel_trend = get_excel_download_data(df[["period", "ratio"]])
-    st.download_button(label="📥 트렌드 엑셀 다운로드", data=excel_trend, file_name=f"trend_{keyword}.xlsx", key=f"dl_trend_{keyword}")
+    col_dltr1, col_dltr2 = st.columns([8, 1])
+    with col_dltr2:
+        st.download_button(label="📥", data=excel_trend, file_name=f"trend_{keyword}.xlsx", key=f"dl_trend_icon_{keyword}", help="트렌드 데이터 엑셀 다운로드")
 
     # ─ 차트 하단 접담 텍스트
     info_icon = "<span title='네이버 API 상대값(0~100pt). 최대 검색량을 100으로 환산한 비율입니다.' style='cursor:help;color:#94a3b8;'>&#9432;</span>"
@@ -244,10 +248,12 @@ def render_gender_distribution_donut(keyword: str = "프로바이오틱스"):
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
-    # ── 엑셀 다운로드 (Gender)
+    # ── 엑셀 다운로드 (Gender) - 소형 아이콘화
     df_gender = pd.DataFrame([{"구분": "여성", "비율(%)": f_pct}, {"구분": "남성", "비율(%)": m_pct}])
     excel_gender = get_excel_download_data(df_gender)
-    st.download_button(label="📥 성별 엑셀 다운로드", data=excel_gender, file_name=f"gender_{keyword}.xlsx", key=f"dl_gender_{keyword}")
+    col_dlg1, col_dlg2 = st.columns([8, 1])
+    with col_dlg2:
+        st.download_button(label="📥", data=excel_gender, file_name=f"gender_{keyword}.xlsx", key=f"dl_gender_icon_{keyword}", help="성별 데이터 엑셀 다운로드")
     st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'>여성 <b>{f_pct}%</b> · 남성 <b>{m_pct}%</b></div>", unsafe_allow_html=True)
 
 
@@ -268,10 +274,12 @@ def render_device_distribution(keyword: str = "프로바이오틱스"):
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
-    # ── 엑셀 다운로드 (Device)
+    # ── 엑셀 다운로드 (Device) - 소형 아이콘화
     df_device = pd.DataFrame([{"구분": "모바일", "비율(%)": mob}, {"구분": "PC", "비율(%)": pc}])
     excel_device = get_excel_download_data(df_device)
-    st.download_button(label="📥 기기별 엑셀 다운로드", data=excel_device, file_name=f"device_{keyword}.xlsx", key=f"dl_device_{keyword}")
+    col_dld1, col_dld2 = st.columns([8, 1])
+    with col_dld2:
+        st.download_button(label="📥", data=excel_device, file_name=f"device_{keyword}.xlsx", key=f"dl_device_icon_{keyword}", help="기기별 데이터 엑셀 다운로드")
     st.markdown(f"<div style='text-align:center;font-size:0.85rem;color:#475569;'><b>모바일 {mob}%</b> · PC {pc}%</div>", unsafe_allow_html=True)
 
 
@@ -300,10 +308,12 @@ def render_age_search_ratio_bar(keyword: str = "프로바이오틱스"):
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
-    # ── 엑셀 다운로드 (Age)
+    # ── 엑셀 다운로드 (Age) - 소형 아이콘화
     df_age = pd.DataFrame([{"연령대": k, "비율(%)": v} for k, v in data.items()])
     excel_age = get_excel_download_data(df_age)
-    st.download_button(label="📥 연령별 엑셀 다운로드", data=excel_age, file_name=f"age_{keyword}.xlsx", key=f"dl_age_{keyword}")
+    col_dla1, col_dla2 = st.columns([8, 1])
+    with col_dla2:
+        st.download_button(label="📥", data=excel_age, file_name=f"age_{keyword}.xlsx", key=f"dl_age_icon_{keyword}", help="연령별 데이터 엑셀 다운로드")
     st.markdown(f"<div style='text-align:left;font-size:0.85rem;color:#475569;margin-top:2px;'>💡 <b>{ages[peak_i]}</b>의 검색 비율이 가장 높습니다</div>", unsafe_allow_html=True)
 
 

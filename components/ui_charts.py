@@ -345,38 +345,61 @@ def render_device_distribution(keyword: str = "프로바이오틱스"):
     st.markdown(f"<div style='text-align:center;font-size:0.82rem;color:#475569;'>쇼핑 시 모바일 비중이 <b>{mob_shop}%</b>로 훨씬 높게 나타납니다.</div>", unsafe_allow_html=True)
 
 
-# ─── 연령별 검색 비율 (Bar — 실제 API) ───────────────────
+# ─── 연령별 비중 (Search vs Shopping 비교) ──────────────────
 def render_age_search_ratio_bar(keyword: str = "프로바이오틱스"):
+    from utils.datalab import fetch_age_ratio, fetch_shopping_age_ratio
     
-    data = fetch_age_ratio(keyword)
-    ages = list(data.keys())
-    vals = list(data.values())
-    peak_i = vals.index(max(vals))
-    colors = ['rgba(96,165,250,0.2)'] * len(ages)
-    colors[peak_i] = '#60a5fa'
+    s_data = fetch_age_ratio(keyword)
+    shop_data = fetch_shopping_age_ratio(keyword)
+    
+    # 10대 ~ 60대 라벨 매핑 (데이터 키와 일치)
+    ages = ["10대", "20대", "30대", "40대", "50대", "60대"]
+    labels = ["10대", "20대", "30대", "40대", "50대", "60대"]
+    
+    s_values = [s_data.get(a, 0) for a in ages]
+    shop_values = [shop_data.get(a, 0) for a in ages]
 
-    fig = go.Figure(data=[go.Bar(
-        x=ages, y=vals,
-        text=[f"{v:.1f}%" for v in vals], textposition='outside',
-        marker_color=colors, marker_line_width=0,
-    )])
+    fig = go.Figure()
+    
+    # 검색 데이터 (회색 계열로 정보 탐색 표현)
+    fig.add_trace(go.Bar(
+        name='🔍 검색(정보탐색)',
+        x=labels, y=s_values,
+        marker_color='#94a3b8', opacity=0.6,
+        text=[f"{v:.1f}%" if v > 0 else "" for v in s_values], textposition='auto',
+    ))
+    
+    # 쇼핑 데이터 (파란색 계열로 구매 의향 표현)
+    fig.add_trace(go.Bar(
+        name='🛒 쇼핑(구매의향)',
+        x=labels, y=shop_values,
+        marker_color='#3b82f6',
+        text=[f"{v:.1f}%" if v > 0 else "" for v in shop_values], textposition='auto',
+    ))
+
     fig.update_layout(
-        plot_bgcolor=EMPTY_BG, paper_bgcolor=EMPTY_BG,
-        margin=dict(t=10, b=30, l=10, r=10), # 아래 여백 넉넉히
-        xaxis=dict(showgrid=False, tickfont=dict(size=12)),
-        yaxis=dict(showgrid=False, showticklabels=False, range=[0, max(vals)*1.2]),
-        height=220,
+        barmode='group',
+        height=280, margin=dict(t=20, b=20, l=10, r=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11)),
+        paper_bgcolor=EMPTY_BG, plot_bgcolor=EMPTY_BG,
+        yaxis=dict(showgrid=True, gridcolor="rgba(200,200,200,0.1)", title="비중 (%)", titlefont=dict(size=10)),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11))
     )
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
-    # ── 엑셀 다운로드 (Age) - 소형 아이콘화
-    df_age = pd.DataFrame([{"연령대": k, "비율(%)": v} for k, v in data.items()])
+    # Excel Download
+    df_age = pd.DataFrame({
+        "연령대": labels,
+        "검색_비중(%)": s_values,
+        "쇼핑_비중(%)": shop_values
+    })
     excel_age = get_excel_download_data(df_age)
-    col_dla1, col_dla2 = st.columns([8, 1])
+    col_dla1, col_dla2 = st.columns([12, 1])
     with col_dla2:
-        st.download_button(label="📥", data=excel_age, file_name=f"age_{keyword}.xlsx", key=f"dl_age_icon_{keyword}", help="연령별 데이터 엑셀 다운로드")
-    st.markdown(f"<div style='text-align:left;font-size:0.85rem;color:#475569;margin-top:2px;'>💡 <b>{ages[peak_i]}</b>의 검색 비율이 가장 높습니다</div>", unsafe_allow_html=True)
+        st.download_button(label="📥", data=excel_age, file_name=f"age_compare_{keyword}.xlsx", key=f"dl_age_icon_{keyword}")
+
+    st.markdown("<div style='text-align:center;font-size:0.7rem;color:#94a3b8;'>※ 쇼핑 데이터는 최근 30일 간의 직접 클릭 분포를 나타냅니다.</div>", unsafe_allow_html=True)
 
 
 # ─── 계절성 분석 (Top 3 피크 월 추출 — 실제 API) ──────────

@@ -189,14 +189,16 @@ def fetch_device_ratio(keyword: str) -> dict:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_age_ratio(keyword: str) -> dict:
-    """{'10대': float, '20대': float, '30대': float, '40대': float, '50대이상': float}"""
+    """네이버 웹과 일치하는 연령대 그룹핑 (10대~60대)"""
     age_groups = {
-        "10대": ["2"], "20대": ["3", "4"], "30대": ["5", "6"],
-        "40대": ["7", "8"], "50대이상": ["9", "10", "11"],
+        "10대": ["1", "2"],
+        "20대": ["3", "4"],
+        "30대": ["5", "6"],
+        "40대": ["7", "8"],
+        "50대": ["9", "10"],
+        "60대": ["11"],
     }
-    # 연령대도 가능하면 정규화 적용 (데이터 확보가 어려운 경우 기존 평균 유지할 수도 있으나 정합성을 위해 적용)
-    results = _calculate_proportional_ratios(keyword, age_groups)
-    return results
+    return _calculate_proportional_ratios(keyword, age_groups)
 
 
 # ═══════════════════════════════════════════════════════
@@ -244,20 +246,70 @@ def fetch_shopping_trend(keyword: str) -> pd.DataFrame:
 
 
 # ═══════════════════════════════════════════════════════
-# 7. 쇼핑 인사이트 전용 비중 산출
+# 7. 쇼핑 인사이트 전용 비중 산출 (직접 API 연동)
 # ═══════════════════════════════════════════════════════
+
+def _call_shopping_dist_api(url: str, keyword: str, days: int = 30) -> dict:
+    """쇼핑 인사이트 전용 분포 API(기기/성별/연령) 공통 호출 함수"""
+    start, end = _date_range(days)
+    body = {
+        "startDate": start, "endDate": end, "timeUnit": "month",
+        "category": "50000006", # 식품 > 건강식품
+        "keyword": keyword
+    }
+    data = _call_naver_api(url, body)
+    if not data or not data.get("results") or not data["results"][0].get("data"):
+        return {}
+    
+    # 여러 날짜의 데이터가 올 수 있으므로, 각 항목별 ratio의 합산 혹은 최근일 기준 비중 계산
+    # 네이버 웹은 '기간 합계' 비중을 보여주므로 모든 항목의 ratio를 합산하여 비중 산출
+    dist_sum = {}
+    for entry in data["results"][0]["data"]:
+        for item in entry.get("group", []):
+            group_name = item["group"]
+            ratio = float(item["ratio"])
+            dist_sum[group_name] = dist_sum.get(group_name, 0.0) + ratio
+            
+    total = sum(dist_sum.values())
+    if total == 0: return {}
+    
+    return {k: round(v / total * 100, 1) for k, v in dist_sum.items()}
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_shopping_device_ratio(keyword: str) -> dict:
-    """쇼핑 클릭 시 기기 비중 {'mobile_pct': float, 'pc_pct': float}"""
-    results = _calculate_proportional_ratios(keyword, {"mobile": "mo", "pc": "pc"}, api_type="shopping")
-    return {"mobile_pct": results.get("mobile", 50), "pc_pct": results.get("pc", 50)}
+    """쇼핑 클릭 시 기기 비중 직접 조회 (모바일: 'mo', PC: 'pc')"""
+    url = "https://openapi.naver.com/v1/datalab/shopping/category/keyword/device"
+    res = _call_shopping_dist_api(url, keyword)
+    return {"mobile_pct": res.get("mo", 50), "pc_pct": res.get("pc", 50)}
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_shopping_gender_ratio(keyword: str) -> dict:
-    """쇼핑 클릭 시 성별 비중 {'female_pct': float, 'male_pct': float}"""
-    results = _calculate_proportional_ratios(keyword, {"female": "f", "male": "m"}, api_type="shopping")
-    return {"female_pct": results.get("female", 50), "male_pct": results.get("male", 50)}
+    """쇼핑 클릭 시 성별 비중 직접 조회 (여성: 'f', 남성: 'm')"""
+    url = "https://openapi.naver.com/v1/datalab/shopping/category/keyword/gender"
+    res = _call_shopping_dist_api(url, keyword)
+    return {"female_pct": res.get("f", 50), "male_pct": res.get("m", 50)}
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_shopping_age_ratio(keyword: str) -> dict:
+    """쇼핑 클릭 시 연령대 비중 직접 조회 및 그룹화 (10대~60대)"""
+    url = "https://openapi.naver.com/v1/datalab/shopping/category/keyword/age"
+    res = _call_shopping_dist_api(url, keyword)
+    
+    # API 코드(1~11)를 웹 UI 그룹(10대~60대)으로 매핑
+    mapping = {
+        "10대": ["1", "2"],
+        "20대": ["3", "4"],
+        "30대": ["5", "6"],
+        "40대": ["7", "8"],
+        "50대": ["9", "10"],
+        "60대": ["11"],
+    }
+    
+    grouped = {}
+    for group_name, codes in mapping.items():
+        grouped[group_name] = sum(res.get(c, 0.0) for c in codes)
+        
+    return grouped
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_radar_metrics(keyword: str) -> dict:
